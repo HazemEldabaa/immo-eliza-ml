@@ -1,12 +1,15 @@
 import joblib
 import pandas as pd
 import numpy as np
+from xgboost import XGBRegressor
 from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.compose import ColumnTransformer, make_column_transformer
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 
 def train():
     """Trains a linear regression model on the full dataset and stores output."""
@@ -15,31 +18,35 @@ def train():
 
     data = data[data["region"]!="Brussels-Capital"]
         # Define features to use
-    num_features = ["nbr_bedrooms", "nbr_frontages","nb_epc","state_building", "total_area_sqm","surface_land_sqm"]
-    fl_features = ["fl_terrace","fl_floodzone","fl_swimming_pool","fl_garden","property_type"]
-    cat_features = ["heating_type"]
+    num_features = ["nbr_bedrooms", "nbr_frontages","nb_epc","state_building", "total_area_sqm","surface_land_sqm","longitude","latitude"]
+    fl_features = ["fl_floodzone","fl_swimming_pool","property_type"]
+    cat_features = ["heating_type","equipped_kitchen","region"]
     data = data[data["price"] <= 1000000]
     #data = data[~data["heating_type"].isin(["WOOD","PELLET"])]
 
     # Split the data into features and target
     X = data[num_features + fl_features + cat_features]
     y = data["price"]
+    preprocessor = make_column_transformer(
+        (make_pipeline(SimpleImputer(strategy='mean'), StandardScaler()), num_features),
+    (make_pipeline(OneHotEncoder()), cat_features),
+    remainder='passthrough'
+    )
+
+    
 
     # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.30, random_state=404
+        X, y, test_size=0.33, random_state=404
     )
-
-     # Impute missing values using SimpleImputer
-    imputer = SimpleImputer(strategy="mean")
-    imputer.fit(X_train[num_features])
-    X_train[num_features] = imputer.transform(X_train[num_features])
-    X_test[num_features] = imputer.transform(X_test[num_features])
-   
+    
+    X_train = preprocessor.fit_transform(X_train)
+    X_test = preprocessor.transform(X_test)
+    #print(f"Features: \n {X_train.columns.tolist()}")
 
 
 
-    model = HistGradientBoostingRegressor(categorical_features=[11])
+    model = XGBRegressor()
 
     model.fit(X_train, y_train)
 
@@ -52,17 +59,17 @@ def train():
     print(f"Test R² score: {test_score}")
    
     # Save the model
-    artifacts = {
+    artifacts1 = {
         "features": {
             "num_features": num_features,
             "fl_features": fl_features,
             "cat_features": cat_features,
         },
-        "imputer": imputer,
+        "preprocessor": preprocessor,
         #"enc": enc,
         "model": model,
     }
-    joblib.dump(artifacts, "models/artifacts1.joblib")
+    joblib.dump(artifacts1, "models/artifacts1.joblib")
 
 
 if __name__ == "__main__":
