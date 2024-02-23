@@ -18,7 +18,7 @@ def predict(input_dataset, output_dataset):
     """Predicts house prices from 'input_dataset', stores it to 'output_dataset'."""
     ### -------- DO NOT TOUCH THE FOLLOWING LINES -------- ###
     # Load the data
-    data = pd.read_csv("badboy.csv")
+    data = pd.read_csv(input_dataset)
     data["original_index"] = data.index
     ### -------------------------------------------------- ###
 
