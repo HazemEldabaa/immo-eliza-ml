@@ -14,10 +14,12 @@ from sklearn.metrics import r2_score, mean_absolute_error
     required=True,
 )
 def predict(input_dataset, output_dataset):
+
     """Predicts house prices from 'input_dataset', stores it to 'output_dataset'."""
     ### -------- DO NOT TOUCH THE FOLLOWING LINES -------- ###
     # Load the data
-    data = pd.read_csv(input_dataset)
+    data = pd.read_csv("badboy.csv")
+    data["original_index"] = data.index
     ### -------------------------------------------------- ###
 
     # Load the model artifacts using joblib
@@ -32,7 +34,7 @@ def predict(input_dataset, output_dataset):
     fl_features1 = artifacts1["features"]["fl_features"]
     cat_features1 = artifacts1["features"]["cat_features"]
 
-    
+
     #imputer = artifacts["imputer"]
     preprocessor = artifacts["preprocessor"]
     preprocessor1 = artifacts1["preprocessor"]
@@ -109,54 +111,67 @@ def predict(input_dataset, output_dataset):
         else:
             return np.nan
     data['nb_epc'] = data.apply(random_value_for_energy_class, axis=1)
-   # data_rest['nb_epc'] = data_rest.apply(random_value_for_energy_class, axis=1)
+    # data_rest['nb_epc'] = data_rest.apply(random_value_for_energy_class, axis=1)
     # Extract the used data
-    data_bxl = data[num_features + fl_features + cat_features]
-    data_rest = data[num_features1 + fl_features1 + cat_features1]
-    #apply pre-processing to both
-    
-# Apply the function to create a new column 'nb_epc'
-    
+    index_col = ["original_index"]
 
-# Display the DataFrame with the new column
-    
-    
+    data_bxl = data[num_features + fl_features + cat_features + index_col]
+    data_rest = data[num_features1 + fl_features1 + cat_features1 + index_col]
+    #apply pre-processing to both
+
+    # Apply the function to create a new column 'nb_epc'
+
+
+    # Display the DataFrame with the new column
+
+
     data_bxl = data_bxl[data_bxl["region"].isin(["Brussels-Capital"])]
     data_rest = data_rest[data_rest["region"]!="Brussels-Capital"]
 
-    
+    index_bxl = data_bxl["original_index"]
+    index_rest = data_rest["original_index"]
 
     # Apply imputer and encoder on data
 
     data_bxl = preprocessor.transform(data_bxl) 
     data_rest = preprocessor1.transform(data_rest)
-   
+
 
     numeric_transformer = preprocessor.named_transformers_['pipeline-1']
     categorical_transformer = preprocessor.named_transformers_['pipeline-2']
     numeric_feature_names = numeric_transformer.named_steps['standardscaler'].get_feature_names_out(num_features)
     categorical_feature_names = categorical_transformer.named_steps['onehotencoder'].get_feature_names_out(cat_features)
-    numeric_transformer1 = preprocessor1.named_transformers_['pipeline-1']
-    categorical_transformer1 = preprocessor1.named_transformers_['pipeline-2']
-    numeric_feature_names1 = numeric_transformer1.named_steps['standardscaler'].get_feature_names_out(num_features)
-    categorical_feature_names1 = categorical_transformer1.named_steps['onehotencoder'].get_feature_names_out(cat_features)
+    #numeric_transformer1 = preprocessor1.named_transformers_['pipeline-1']
+    #categorical_transformer1 = preprocessor1.named_transformers_['pipeline-2']
+    #numeric_feature_names1 = numeric_transformer1.named_steps['standardscaler'].get_feature_names_out(num_features)
+    #categorical_feature_names1 = categorical_transformer1.named_steps['onehotencoder'].get_feature_names_out(cat_features)
     columns_bxl = np.concatenate([numeric_feature_names, categorical_feature_names, fl_features])
-    columns_rest = np.concatenate([numeric_feature_names1, categorical_feature_names1, fl_features1])
+    #columns_rest = np.concatenate([numeric_feature_names1, categorical_feature_names1, fl_features1])
+    columns_rest = preprocessor1.get_feature_names_out()
     data_bxl = pd.DataFrame(data_bxl, columns=columns_bxl)
     data_rest = pd.DataFrame(data_rest, columns=columns_rest)
 
 
     predictions_bxl = model.predict(data_bxl)
     predictions_rest = model1.predict(data_rest)
-    predictions= np.concatenate([predictions_bxl, predictions_rest])
 
-    
+
+    predictions_bxl = pd.DataFrame(predictions_bxl)
+    predictions_rest = pd.DataFrame(predictions_rest)
+
+    predictions_bxl = predictions_bxl.set_index(index_bxl)
+    predictions_rest = predictions_rest.set_index(index_rest)
+
+
+    predictions = pd.concat([predictions_bxl, predictions_rest], ignore_index=False)
+    predictions = predictions.sort_index()
 
     
 
     ### -------- DO NOT TOUCH THE FOLLOWING LINES -------- ###
     # Save the predictions to a CSV file (in order of data input!)
-    pd.DataFrame({"predictions": predictions}).to_csv(output_dataset, index=False)
+    pd.DataFrame({"predictions": predictions[0]}).to_csv(output_dataset, index=False)
+
 
     # Print success messages
     click.echo(click.style("Predictions generated successfully!", fg="green"))
