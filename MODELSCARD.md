@@ -97,11 +97,11 @@ python train_all.py
 - To generate predictions for the two-model in /output (You can replace "data/input.csv" with another input of your choice)
 
 ```bash
-python .\predict.py -i "data\input.csv" -o "output\predictions.csv"
+python .\predict_2model.py -i "data\input.csv" -o "output\predictions.csv"
 ```
 - To generate predictions for the general model
 ```bash
-python .\predict_all.py -i "data\input.csv" -o "output\predictions.csv"
+python .\predict.py -i "data\input.csv" -o "output\predictions.csv"
 ```
 
 - To validate the models on the secret data, make sure that ```predictions.csv``` has the predictions of the model intended for validation, then run:

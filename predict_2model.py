@@ -2,6 +2,7 @@ import click
 import joblib
 import pandas as pd
 import numpy as np
+from sklearn.metrics import r2_score, mean_absolute_error
 
 @click.command()
 @click.option("-i", "--input-dataset", help="path to input .csv dataset", required=True)
@@ -13,24 +14,34 @@ import numpy as np
     required=True,
 )
 def predict(input_dataset, output_dataset):
+
     """Predicts house prices from 'input_dataset', stores it to 'output_dataset'."""
     ### -------- DO NOT TOUCH THE FOLLOWING LINES -------- ###
     # Load the data
     data = pd.read_csv(input_dataset)
+    data["original_index"] = data.index
     ### -------------------------------------------------- ###
 
     # Load the model artifacts using joblib
-    artifacts = joblib.load("models/artifacts_all.joblib")
+    artifacts = joblib.load("models/artifacts_bxl.joblib")
+    artifacts1 = joblib.load("models/artifacts_rest.joblib")
 
     # Unpack the artifacts
     num_features = artifacts["features"]["num_features"]
     fl_features = artifacts["features"]["fl_features"]
     cat_features = artifacts["features"]["cat_features"]
-    imputer = artifacts["imputer"]
-    enc = artifacts["enc"]
-    model = artifacts["model"]
+    num_features1 = artifacts1["features"]["num_features"]
+    fl_features1 = artifacts1["features"]["fl_features"]
+    cat_features1 = artifacts1["features"]["cat_features"]
 
-    # Extract the used data
+
+    #imputer = artifacts["imputer"]
+    preprocessor = artifacts["preprocessor"]
+    imputer = artifacts1["imputer"]
+    enc = artifacts1["enc"]
+    model = artifacts["model"]
+    model1 = artifacts1["model"]
+
     energy_class_bxl =  {
     'A++': (-20, 0),
     'A+': (0, 15),
@@ -100,29 +111,65 @@ def predict(input_dataset, output_dataset):
         else:
             return np.nan
     data['nb_epc'] = data.apply(random_value_for_energy_class, axis=1)
+    # Extract the used data
+    index_col = ["original_index"]
 
-    data = data[num_features + fl_features + cat_features]
+    data_bxl = data[num_features + fl_features + cat_features + index_col]
+    data_rest = data[num_features1 + fl_features1 + cat_features1 + index_col]
+
+
+
+    # Display the DataFrame with the new column
+
+
+    data_bxl = data_bxl[data_bxl["region"].isin(["Brussels-Capital"])]
+    data_rest = data_rest[data_rest["region"]!="Brussels-Capital"]
+
+    index_bxl = data_bxl["original_index"]
+    index_rest = data_rest["original_index"]
 
     # Apply imputer and encoder on data
-    data[num_features] = imputer.transform(data[num_features])
-    data_cat = enc.transform(data[cat_features]).toarray()
+
+        # Apply imputer and encoder on data
+    data_rest[num_features1] = imputer.transform(data_rest[num_features1])
+    data_cat = enc.transform(data_rest[cat_features1]).toarray()
 
     # Combine the numerical and one-hot encoded categorical columns
-    data = pd.concat(
+    data_rest = pd.concat(
         [
-            data[num_features + fl_features].reset_index(drop=True),
+            data_rest[num_features1 + fl_features1].reset_index(drop=True),
             pd.DataFrame(data_cat, columns=enc.get_feature_names_out()),
         ],
         axis=1,
     )
 
-    # Make predictions
-    predictions = model.predict(data)
+    data_bxl = preprocessor.transform(data_bxl)
+
+  
+    columns_bxl = preprocessor.get_feature_names_out()
+    
+    data_bxl = pd.DataFrame(data_bxl, columns=columns_bxl)
+    
+    
+
+    predictions_bxl = model.predict(data_bxl)
+    predictions_rest = model1.predict(data_rest)
+
+
+    predictions_bxl = pd.DataFrame(predictions_bxl)
+    predictions_rest = pd.DataFrame(predictions_rest)
+
+    predictions_bxl = predictions_bxl.set_index(index_bxl)
+    predictions_rest = predictions_rest.set_index(index_rest)
+   
+    predictions = pd.concat([predictions_bxl, predictions_rest], ignore_index=False)
+    predictions = predictions.sort_index()
     
 
     ### -------- DO NOT TOUCH THE FOLLOWING LINES -------- ###
     # Save the predictions to a CSV file (in order of data input!)
-    pd.DataFrame({"predictions": predictions}).to_csv(output_dataset, index=False)
+    pd.DataFrame({"predictions": predictions[0]}).to_csv(output_dataset, index=False)
+
 
     # Print success messages
     click.echo(click.style("Predictions generated successfully!", fg="green"))
